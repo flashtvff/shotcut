@@ -26,6 +26,7 @@
 #include "gpuinfo.h"
 #include "jobqueue.h"
 #include "jobs/encodejob.h"
+#include "jobs/ultrahdjob.h"
 #include "mainwindow.h"
 #include "mltcontroller.h"
 #include "models/markersmodel.h"
@@ -90,6 +91,7 @@ EncodeDock::EncodeDock(QWidget *parent)
     LOG_DEBUG() << "begin";
     initSpecialCodecLists();
     ui->setupUi(this);
+    setupCapFlashOptions();
     Util::setColorsToHighlight(ui->resampleWarningLabel);
     hideResampleWarning(true);
     // TODO: Reframe does not work--even affine filter
@@ -555,6 +557,114 @@ void EncodeDock::onProducerOpened()
     updateHdrMetaButton();
 }
 
+void EncodeDock::setupCapFlashOptions()
+{
+    QSettings settings;
+    settings.beginGroup("capflash");
+
+    auto box = new QGroupBox(QStringLiteral("Cap Flash"), this);
+    auto grid = new QGridLayout(box);
+
+    grid->addWidget(new QLabel(tr("Resolução"), box), 0, 0);
+    m_cfResolution = new QComboBox(box);
+    m_cfResolution->addItem(tr("Original"), 0);
+    m_cfResolution->addItem(QStringLiteral("2K (2560)"), 2560);
+    m_cfResolution->addItem(QStringLiteral("4K (3840)"), 3840);
+    m_cfResolution->setToolTip(tr("O lado maior do vídeo vira 2560 ou 3840 pixels, mantendo a proporção "
+                                  "(funciona com vídeo deitado ou em pé)."));
+    m_cfResolution->setCurrentIndex(
+        qBound(0, settings.value("resolution", 0).toInt(), m_cfResolution->count() - 1));
+    grid->addWidget(m_cfResolution, 0, 1);
+
+    m_cfStripMetadata = new QCheckBox(tr("Remover todos os metadados"), box);
+    m_cfStripMetadata->setToolTip(
+        tr("Tira título, autor, datas e a marca do programa do arquivo exportado."));
+    m_cfStripMetadata->setChecked(settings.value("stripMetadata", true).toBool());
+    grid->addWidget(m_cfStripMetadata, 1, 0, 1, 2);
+
+    m_cfUltraHd = new QCheckBox(tr("Ultra HD (IA) - melhora a qualidade, exporta mais devagar"), box);
+    m_cfUltraHd->setToolTip(tr("Usa a IA Real-ESRGAN na placa de vídeo para recriar detalhes e "
+                               "ampliar até a resolução escolhida acima (2K ou 4K)."));
+    m_cfUltraHd->setChecked(settings.value("ultraHd", false).toBool());
+    grid->addWidget(m_cfUltraHd, 2, 0, 1, 2);
+
+    grid->addWidget(new QLabel(tr("Modo da IA"), box), 3, 0);
+    m_cfUltraHdModel = new QComboBox(box);
+    m_cfUltraHdModel->addItem(tr("Rápido"), QStringLiteral("realesr-animevideov3"));
+    m_cfUltraHdModel->addItem(tr("Máxima qualidade (bem lento)"), QStringLiteral("realesrgan-x4plus"));
+    m_cfUltraHdModel->setCurrentIndex(
+        qBound(0, settings.value("ultraHdModel", 0).toInt(), m_cfUltraHdModel->count() - 1));
+    grid->addWidget(m_cfUltraHdModel, 3, 1);
+    m_cfUltraHdModel->setEnabled(m_cfUltraHd->isChecked());
+
+#ifndef Q_OS_WIN
+    m_cfUltraHd->setChecked(false);
+    m_cfUltraHd->setEnabled(false);
+    m_cfUltraHd->setToolTip(tr("Disponível apenas no Windows."));
+    m_cfUltraHdModel->setEnabled(false);
+#endif
+
+    connect(m_cfResolution, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [](int i) {
+        QSettings s;
+        s.setValue("capflash/resolution", i);
+    });
+    connect(m_cfStripMetadata, &QCheckBox::toggled, this, [](bool on) {
+        QSettings s;
+        s.setValue("capflash/stripMetadata", on);
+    });
+    connect(m_cfUltraHd, &QCheckBox::toggled, this, [this](bool on) {
+        QSettings s;
+        s.setValue("capflash/ultraHd", on);
+        m_cfUltraHdModel->setEnabled(on);
+    });
+    connect(m_cfUltraHdModel,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [](int i) {
+                QSettings s;
+                s.setValue("capflash/ultraHdModel", i);
+            });
+
+    ui->verticalLayout->insertWidget(0, box);
+}
+
+int EncodeDock::capFlashTargetLongSide() const
+{
+    return m_cfResolution ? m_cfResolution->currentData().toInt() : 0;
+}
+
+bool EncodeDock::capFlashUltraHdActive() const
+{
+    return m_cfUltraHd && m_cfUltraHd->isEnabled() && m_cfUltraHd->isChecked()
+           && !ui->disableVideoCheckbox->isChecked() && ui->formatCombo->currentText() != "image2";
+}
+
+QString EncodeDock::capFlashTempTarget(const QString &finalTarget) const
+{
+    QFileInfo fi(finalTarget);
+    const QString suffix = fi.suffix().isEmpty() ? QStringLiteral("mp4") : fi.suffix();
+    return fi.dir().filePath(
+        QStringLiteral("%1.capflash-temp.%2").arg(fi.completeBaseName(), suffix));
+}
+
+void EncodeDock::enqueueCapFlashJob(MeltJob *job, const QString &finalTarget)
+{
+    const QString temp = capFlashTempTarget(finalTarget);
+    int longSide = capFlashTargetLongSide();
+    if (longSide <= 0) {
+        // Original resolution: Ultra HD still cleans up the image at the same size.
+        longSide = qMax(ui->widthSpinner->value(), ui->heightSpinner->value());
+    }
+    const QString model = m_cfUltraHdModel->currentData().toString();
+    connect(job,
+            &AbstractJob::finished,
+            this,
+            [temp, finalTarget, longSide, model](AbstractJob *, bool isSuccess, QString) {
+                if (isSuccess)
+                    JOBS.add(new UltraHdJob(temp, finalTarget, longSide, model));
+            });
+}
+
 void EncodeDock::loadPresets()
 {
     QStandardItemModel *sourceModel = (QStandardItemModel *) m_presetsModel.sourceModel();
@@ -674,6 +784,21 @@ Mlt::Properties *EncodeDock::collectProperties(int realtime, bool includeProfile
     if (p && p->is_valid()) {
         foreach (QString line, ui->advancedTextEdit->toPlainText().split("\n"))
             p->parse(line.toUtf8().constData());
+        // Cap Flash: Original / 2K / 4K (skipped when Ultra HD will upscale afterwards)
+        if (realtime && !ui->disableVideoCheckbox->isChecked() && !capFlashUltraHdActive()) {
+            const int longSide = capFlashTargetLongSide();
+            const int w = ui->widthSpinner->value();
+            const int h = ui->heightSpinner->value();
+            if (longSide > 0 && w > 0 && h > 0) {
+                const double scale = double(longSide) / double(qMax(w, h));
+                int nw = qRound(w * scale);
+                int nh = qRound(h * scale);
+                nw -= nw % 2;
+                nh -= nh % 2;
+                setIfNotSet(p, "width", nw);
+                setIfNotSet(p, "height", nh);
+            }
+        }
         if (!ui->coverArtLineEdit->text().trimmed().isEmpty())
             setIfNotSet(p,
                         "attached_pic",
@@ -1298,6 +1423,18 @@ Mlt::Properties *EncodeDock::collectProperties(int realtime, bool includeProfile
                 }
             }
         }
+        // Cap Flash: remove all metadata (title, artist, dates, encoder tag)
+        if (realtime && m_cfStripMetadata && m_cfStripMetadata->isChecked()) {
+            QStringList names;
+            for (int i = 0; i < p->count(); i++) {
+                const QString name = QString::fromLatin1(p->get_name(i));
+                if (name.startsWith("meta.attr."))
+                    names << name;
+            }
+            for (const auto &name : names)
+                p->clear(name.toLatin1().constData());
+            p->set("fflags", "+bitexact");
+        }
     }
     return p;
 }
@@ -1748,26 +1885,34 @@ void EncodeDock::enqueueMelt(const QStringList &targets, int realtime)
                 QScopedPointer<Mlt::Producer> producer(
                     new Mlt::Producer(MLT.profile(), "xml-string", xml.toUtf8().constData()));
                 producer->set_in_and_out(info->frame_in, info->frame_out);
-                MeltJob *job = createMeltJob(producer.data(), targets[i], realtime, pass);
+                const QString target = capFlashUltraHdActive() ? capFlashTempTarget(targets[i])
+                                                               : targets[i];
+                MeltJob *job = createMeltJob(producer.data(), target, realtime, pass);
                 if (job) {
                     JOBS.add(job);
                     if (pass) {
-                        job = createMeltJob(producer.data(), targets[i], realtime, 2);
+                        job = createMeltJob(producer.data(), target, realtime, 2);
                         if (job)
                             JOBS.add(job);
                     }
+                    if (job && target != targets[i])
+                        enqueueCapFlashJob(job, targets[i]);
                 }
             }
         }
     } else {
-        MeltJob *job = createMeltJob(service, targets[0], realtime, pass);
+        const QString target = capFlashUltraHdActive() ? capFlashTempTarget(targets[0])
+                                                       : targets[0];
+        MeltJob *job = createMeltJob(service, target, realtime, pass);
         if (job) {
             JOBS.add(job);
             if (pass) {
-                job = createMeltJob(service, targets[0], realtime, 2);
+                job = createMeltJob(service, target, realtime, 2);
                 if (job)
                     JOBS.add(job);
             }
+            if (job && target != targets[0])
+                enqueueCapFlashJob(job, targets[0]);
         }
     }
 }

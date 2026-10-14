@@ -3109,8 +3109,11 @@ void MainWindow::on_actionAbout_Shotcut_triggered()
         this,
         tr("About %1").arg(qApp->applicationName()),
         QStringLiteral(
-            "<h1>Shotcut version %2</h1>"
-            "<p><a href=\"%3\">%1</a> is a free, open source, cross platform video editor.</p>"
+            "<h1>%1 versão %2</h1>"
+            "<p>%1 é um editor de vídeo gratuito e de código aberto, baseado no "
+            "<a href=\"%3\">Shotcut</a> (créditos à Meltytech, LLC e colaboradores). "
+            "Código-fonte: <a href=\"https://github.com/flashtvff/shotcut\">"
+            "github.com/flashtvff/shotcut</a>.</p>"
             "<small><p>%4</p>"
             "<p>Licensed under the %5</p>"
             "<p>This program proudly uses the following projects:<ul>"

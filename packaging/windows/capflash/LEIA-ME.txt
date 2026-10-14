@@ -1,0 +1,29 @@
+CAP FLASH - editor de video
+==========================
+
+Como abrir: de dois cliques em CapFlash.exe (nao precisa instalar).
+Se o Windows mostrar "O Windows protegeu o computador", clique em
+"Mais informacoes" e depois em "Executar assim mesmo".
+
+Opcoes do Cap Flash (painel "Cap Flash" na tela Exportar):
+- Resolucao: Original, 2K (2560) ou 4K (3840). Mantem a proporcao.
+- Remover todos os metadados: tira titulo, autor, datas e a marca do
+  programa do arquivo exportado. Vem ligado.
+- Ultra HD (IA): usa a IA Real-ESRGAN na placa de video para recriar
+  detalhes. Precisa de placa de video com Vulkan (driver atualizado).
+  Exporta bem mais devagar.
+
+Sem marca d'agua.
+
+CREDITOS E LICENCA
+Cap Flash e baseado no Shotcut (https://www.shotcut.org), criado por
+Dan Dennedy / Meltytech, LLC e colaboradores, distribuido sob a licenca
+GNU GPL versao 3 (veja COPYING.txt). Cap Flash tambem e GPL v3.
+Codigo-fonte do Cap Flash: https://github.com/flashtvff/shotcut
+
+Ultra HD usa Real-ESRGAN (https://github.com/xinntao/Real-ESRGAN,
+licenca BSD 3-Clause, Xintao Wang) e Real-ESRGAN-ncnn-vulkan
+(licenca MIT).
+
+Outros componentes (Qt, MLT, FFmpeg, x264 e outros) mantem suas
+proprias licencas.

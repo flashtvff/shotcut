@@ -84,6 +84,7 @@ add_executable(shotcut WIN32 MACOSX_BUNDLE
   jobs/postjobaction.cpp jobs/postjobaction.h
   jobs/qimagejob.cpp jobs/qimagejob.h
   jobs/screencapturejob.cpp jobs/screencapturejob.h
+  jobs/ultrahdjob.cpp jobs/ultrahdjob.h
   jobs/videoqualityjob.cpp jobs/videoqualityjob.h
   jobs/whisperjob.cpp jobs/whisperjob.h
   main.cpp

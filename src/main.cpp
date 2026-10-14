@@ -86,8 +86,8 @@ static bool isVulkanDrawMethod(int argc, char **argv, QString *detail)
     if (appDataDir.isEmpty()) {
         QSettings settings(QSettings::NativeFormat,
                            QSettings::UserScope,
-                           QStringLiteral("Meltytech"),
-                           QStringLiteral("Shotcut"));
+                           QStringLiteral("CapFlash"),
+                           QStringLiteral("Cap Flash"));
         appDataDir = settings.value(QStringLiteral("appdatadir")).toString();
         if (appDataDir.isEmpty() || !QFile::exists(appDataDir + QStringLiteral("/shotcut.ini"))) {
             const int value
@@ -177,7 +177,7 @@ public:
 #ifdef Q_OS_WIN
 #include <winbase.h>
         SetDllDirectoryA(appPath.toLocal8Bit());
-        CreateMutexA(NULL, FALSE, "Meltytech Shotcut Running Mutex");
+        CreateMutexA(NULL, FALSE, "CapFlash Running Mutex");
 #else
         dir.cdUp();
 #endif
@@ -189,14 +189,14 @@ public:
         dir.cd("qt6");
 #endif
         addLibraryPath(dir.absolutePath());
-        setOrganizationName("Meltytech");
+        setOrganizationName("CapFlash");
 #if defined(Q_OS_UNIX) && !defined(Q_OS_MAC)
         setOrganizationDomain("shotcut.org");
         setDesktopFileName("org.shotcut.Shotcut");
 #else
         setOrganizationDomain("meltytech.com");
 #endif
-        setApplicationName("Shotcut");
+        setApplicationName("Cap Flash");
         setApplicationVersion(SHOTCUT_VERSION);
 
         // Process command line options.

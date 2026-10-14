@@ -29,6 +29,8 @@
 
 class QTreeWidgetItem;
 class QTemporaryFile;
+class QComboBox;
+class QCheckBox;
 namespace Ui {
 class EncodeDock;
 }
@@ -175,6 +177,17 @@ private:
     int m_hdrMasterPreset{0}; // 0=BT.2020, 1=P3-D65
     int m_hdrMaxLuminance{1000};
     double m_hdrMinLuminance{0.01};
+
+    // Cap Flash
+    QComboBox *m_cfResolution{nullptr};
+    QCheckBox *m_cfStripMetadata{nullptr};
+    QCheckBox *m_cfUltraHd{nullptr};
+    QComboBox *m_cfUltraHdModel{nullptr};
+    void setupCapFlashOptions();
+    int capFlashTargetLongSide() const;
+    bool capFlashUltraHdActive() const;
+    void enqueueCapFlashJob(MeltJob *job, const QString &finalTarget);
+    QString capFlashTempTarget(const QString &finalTarget) const;
 
     void loadPresets();
     Mlt::Properties *collectProperties(int realtime, bool includeProfile = false);
